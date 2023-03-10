@@ -138,3 +138,8 @@ fabric.properties
 .idea/**/azureSettings.xml
 
 # End of https://www.toptal.com/developers/gitignore/api/goland,go
+/.idea/.gitignore
+/go.sum
+/.idea/LazyRaven.iml
+/.idea/modules.xml
+/.idea/vcs.xml
