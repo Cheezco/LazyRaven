@@ -2,6 +2,26 @@ package main
 
 import "time"
 
+type OutputType int
+
+const (
+	Console OutputType = iota
+	Api
+	ConsoleApi
+)
+
+type ComputedData struct {
+	Name            string    `json:"name"`
+	CpuDelta        int64     `json:"cpuDelta"`
+	SystemCpuDelta  int64     `json:"systemCpuDelta"`
+	CpuUsagePerc    float64   `json:"cpuUsagePerc"`
+	UsedMemory      int64     `json:"usedMemory"`
+	MemoryUsagePerc int64     `json:"MemoryUsagePerc"`
+	NumberCpus      int       `json:"numberCpus"`
+	CpuEnergy       int       `json:"cpuEnergy"`
+	TimeStamp       time.Time `json:"timeStamp"`
+}
+
 type ContainerData struct {
 	Read      time.Time `json:"read"`
 	Preread   time.Time `json:"preread"`

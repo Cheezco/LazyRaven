@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"github.com/docker/docker/client"
 	"log"
+	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var containersRaw string
@@ -16,9 +20,12 @@ var parserCount int
 var printerCount int
 var iterations int
 var delay int
+var outputType OutputType
+var cpuEnergyUsage int
 
 func main() {
-	PrepareFlags()
+	prepareFlags()
+	initialize()
 
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -32,10 +39,14 @@ func main() {
 		}
 	}(cli)
 
-	DoWork(ctx, cli)
+	doWork(ctx, cli)
 }
 
-func DoWork(ctx context.Context, cli *client.Client) {
+func initialize() {
+	loadCpuEnergyUsage()
+}
+
+func doWork(ctx context.Context, cli *client.Client) {
 	var printerWaitGroup sync.WaitGroup
 	var parserWaitGroup sync.WaitGroup
 	var queryWaitGroup sync.WaitGroup
@@ -57,8 +68,15 @@ func DoWork(ctx context.Context, cli *client.Client) {
 	for i := 0; i < parserCount; i++ {
 		go ParseData(dataChan, parsedDataChan, &parserWaitGroup)
 	}
-	for i := 0; i < printerCount; i++ {
-		go PrintToConsole(parsedDataChan, &printerWaitGroup)
+	if outputType == Console || outputType == ConsoleApi {
+		for i := 0; i < printerCount; i++ {
+			go printToConsole(parsedDataChan, &printerWaitGroup)
+		}
+	}
+	if outputType == Api || outputType == ConsoleApi {
+		storedDataChan := make(chan ComputedData)
+		go updateApiData(parsedDataChan, storedDataChan)
+		go StartApi(storedDataChan)
 	}
 
 	queryWaitGroup.Wait()
@@ -68,28 +86,108 @@ func DoWork(ctx context.Context, cli *client.Client) {
 	printerWaitGroup.Wait()
 }
 
-func PrepareFlags() {
+func prepareFlags() {
 	flag.StringVar(&containersRaw, "Containers", "", "Container ids. Separated by comma.")
 	flag.IntVar(&parserCount, "Parsers", 1, "Number of parsers.")
 	flag.IntVar(&printerCount, "Printers", 1, "Number of printers.")
-	flag.IntVar(&iterations, "Iterations", 5, "Number of iterations. -1 for infinite.")
+	flag.IntVar(&iterations, "Iterations", 5, "Number of iterations. 0 for infinite.")
 	flag.IntVar(&delay, "Delay", -1, "Query delay in milliseconds. -1 no delay")
+	flag.IntVar((*int)(&outputType), "Output", 0, "Output type. 0 - Console, 1 - Api(/data), 2 - both")
 
 	flag.Parse()
 	containers = strings.Split(containersRaw, ",")
 }
 
-func PrintToConsole(parsedDataChan <-chan ContainerData, waitgroup *sync.WaitGroup) {
+func updateApiData(parsedDataChan <-chan ContainerData, storedDataChan chan<- ComputedData) {
 	for value := range parsedDataChan {
-		cpuDelta := value.CPUStats.CPUUsage.TotalUsage - value.PrecpuStats.CPUUsage.TotalUsage
-		systemCpuDelta := value.CPUStats.SystemCPUUsage - value.PrecpuStats.SystemCPUUsage
-		cpuUsage := (cpuDelta / systemCpuDelta) * int64(value.CPUStats.OnlineCpus) * 100.0
+		var computedData = getComputedData(value)
+		storedDataChan <- computedData
+	}
+	close(storedDataChan)
+}
 
-		usedMemory := value.MemoryStats.Usage - value.MemoryStats.Stats.Cache
-		memoryUsage := (usedMemory / value.MemoryStats.Limit) * 100.0
+func printToConsole(parsedDataChan <-chan ContainerData, waitgroup *sync.WaitGroup) {
+	for value := range parsedDataChan {
+		var computedData = getComputedData(value)
 
-		fmt.Printf("Name: %s CPU: %d%% Memory(%%): %d Memory(MB): %d\n", value.Name, cpuUsage, memoryUsage, usedMemory/1000000)
+		fmt.Printf(
+			"Name: %s CPU: %f%% Memory(%%): %d Memory(MB): %d\n",
+			computedData.Name,
+			computedData.CpuUsagePerc,
+			computedData.MemoryUsagePerc,
+			computedData.UsedMemory/1000000,
+		)
 	}
 
 	waitgroup.Done()
+}
+
+func loadCpuEnergyUsage() {
+	fmt.Println("Loading cpu energy usage")
+	cmd := exec.Command("./HardwareMonitor.exe", "1")
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		fmt.Println("Error creating StdoutPipe for command", err)
+		return
+	}
+
+	if err := cmd.Start(); err != nil {
+		fmt.Println("Error starting command", err)
+		return
+	}
+
+	count := 0
+	sum := 0
+
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		convertedValue, err := strconv.Atoi(scanner.Text())
+		if err != nil {
+			continue
+		}
+		count += 1
+		sum += convertedValue
+	}
+
+	cpuEnergyUsage = sum / count
+
+	if err := cmd.Wait(); err != nil {
+		fmt.Println("HardwareMonitor finished with error", err)
+		return
+	}
+
+	fmt.Println("Finished loading cpu energy usage")
+}
+
+func getComputedData(value ContainerData) ComputedData {
+	cpuDelta := value.CPUStats.CPUUsage.TotalUsage - value.PrecpuStats.CPUUsage.TotalUsage
+	systemCpuDelta := value.CPUStats.SystemCPUUsage - value.PrecpuStats.SystemCPUUsage
+	cpuUsage := (float64(cpuDelta) / float64(systemCpuDelta)) * float64(value.CPUStats.OnlineCpus) * 100.0
+
+	usedMemory := value.MemoryStats.Usage - value.MemoryStats.Stats.Cache
+	var memoryUsage int64
+	if value.MemoryStats.Limit != 0 {
+		memoryUsage = (usedMemory / value.MemoryStats.Limit) * 100.0
+	} else {
+		memoryUsage = 0
+	}
+
+	numberCpus := len(value.CPUStats.CPUUsage.PercpuUsage)
+	cpuEnergy := int(cpuUsage) / 100 * cpuEnergyUsage
+	if cpuEnergy < 0 {
+		cpuEnergy = 0
+	}
+
+	return ComputedData{
+		Name:            value.Name[1:],
+		CpuDelta:        cpuDelta,
+		SystemCpuDelta:  systemCpuDelta,
+		CpuUsagePerc:    cpuUsage,
+		UsedMemory:      usedMemory,
+		MemoryUsagePerc: memoryUsage,
+		NumberCpus:      numberCpus,
+		CpuEnergy:       int(cpuUsage) / 100 * cpuEnergyUsage,
+		TimeStamp:       time.Now(),
+	}
 }

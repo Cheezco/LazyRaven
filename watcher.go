@@ -36,7 +36,7 @@ func QueryContainerStream(
 
 	buf := make([]byte, 1)
 	buf2 := make([]byte, 0)
-	for i := 0; i < iterations; i++ {
+	for i := 0; i < iterations || iterations == -1; i++ {
 
 		for !json.Valid(buf2) || len(buf2) < 5 {
 			_, err := io.ReadFull(containerStats.Body, buf)
@@ -51,7 +51,7 @@ func QueryContainerStream(
 		buf = make([]byte, 1)
 		buf2 = make([]byte, 0)
 		if iterations == -1 {
-			i = -2
+			i -= 1
 		}
 	}
 
@@ -67,7 +67,7 @@ func QueryContainer(
 ) {
 	buf := new(bytes.Buffer)
 
-	for i := 0; i < iterations; i++ {
+	for i := 0; i < iterations || iterations == -1; i++ {
 		containerStats, err := cli.ContainerStats(ctx, container, false)
 		if err != nil {
 			log.Fatal(err)
@@ -81,7 +81,7 @@ func QueryContainer(
 		buf.Reset()
 
 		if iterations == -1 {
-			i = -2
+			i -= 1
 		}
 	}
 
