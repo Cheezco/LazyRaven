@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/docker/docker/client"
+	"github.com/shirou/gopsutil/cpu"
 	"log"
 	"os/exec"
 	"strconv"
@@ -111,7 +112,7 @@ func printToConsole(parsedDataChan <-chan ContainerData, waitgroup *sync.WaitGro
 		var computedData = getComputedData(value)
 
 		fmt.Printf(
-			"Name: %s CPU: %f%% Memory(%%): %d Memory(MB): %d\n",
+			"Name: %s CPU: %f%% Memory(%%): %f Memory(MB): %d Energy Usage: %f\n",
 			computedData.Name,
 			computedData.CpuUsagePerc,
 			computedData.MemoryUsagePerc,
@@ -159,12 +160,14 @@ func loadCpuEnergyUsage() {
 	}
 
 	fmt.Println("Finished loading cpu energy usage")
+	fmt.Printf("CPU Energy Usage: %d\n", cpuEnergyUsage)
 }
 
 func getComputedData(value ContainerData) ComputedData {
 	cpuDelta := value.CPUStats.CPUUsage.TotalUsage - value.PrecpuStats.CPUUsage.TotalUsage
 	systemCpuDelta := value.CPUStats.SystemCPUUsage - value.PrecpuStats.SystemCPUUsage
-	cpuUsage := (float64(cpuDelta) / float64(systemCpuDelta)) * float64(value.CPUStats.OnlineCpus) * 100.0
+	//cpuUsage := (float64(cpuDelta) / float64(systemCpuDelta)) * float64(value.CPUStats.OnlineCpus) * 100.0
+	cpuUsage := (float64(cpuDelta) / float64(systemCpuDelta)) * 100.0
 
 	usedMemory := value.MemoryStats.Usage - value.MemoryStats.Stats.Cache
 	var memoryUsage float64
@@ -175,7 +178,8 @@ func getComputedData(value ContainerData) ComputedData {
 	}
 
 	numberCpus := len(value.CPUStats.CPUUsage.PercpuUsage)
-	cpuEnergy := int(cpuUsage) / 100 * cpuEnergyUsage
+	cpuPerc, _ := cpu.Percent(0, false)
+	cpuEnergy := (float64(cpuUsage) / 100) * float64(cpuEnergyUsage) * cpuPerc[0] / 100
 	if cpuEnergy < 0 {
 		cpuEnergy = 0
 	}
