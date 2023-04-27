@@ -91,7 +91,7 @@ func prepareFlags() {
 	flag.StringVar(&containersRaw, "Containers", "", "Container ids. Separated by comma.")
 	flag.IntVar(&parserCount, "Parsers", 1, "Number of parsers.")
 	flag.IntVar(&printerCount, "Printers", 1, "Number of printers.")
-	flag.IntVar(&iterations, "Iterations", 5, "Number of iterations. 0 for infinite.")
+	flag.IntVar(&iterations, "Iterations", 5, "Number of iterations. -1 for infinite.")
 	flag.IntVar(&delay, "Delay", -1, "Query delay in milliseconds. -1 no delay")
 	flag.IntVar((*int)(&outputType), "Output", 0, "Output type. 0 - Console, 1 - Api(/data), 2 - both")
 
