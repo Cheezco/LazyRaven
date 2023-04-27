@@ -55,13 +55,13 @@ func getPrometheusDataResponse(data ComputedData) string {
 raven_%s_cpu_usage_percentage %f
 # HELP MemoryUsagePercentage
 # TYPE raven_%s_memory_usage_percentage gauge
-raven_%s_memory_usage_percentage %d
+raven_%s_memory_usage_percentage %f
 # HELP MemoryUsageBytes
 # TYPE raven_%s_memory_usage_bytes gauge
 raven_%s_memory_usage_bytes %d
 # HELP Energy usage in watts
 # TYPE raven_%s_energy_usage gauge
-raven_%s_energy_usage %d`,
+raven_%s_energy_usage %f`,
 		data.Name,
 		data.Name,
 		data.CpuUsagePerc,

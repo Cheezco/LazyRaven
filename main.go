@@ -115,7 +115,8 @@ func printToConsole(parsedDataChan <-chan ContainerData, waitgroup *sync.WaitGro
 			computedData.Name,
 			computedData.CpuUsagePerc,
 			computedData.MemoryUsagePerc,
-			computedData.UsedMemory/1000000,
+			computedData.UsedMemory/1000000.0,
+			computedData.CpuEnergy,
 		)
 	}
 
@@ -166,9 +167,9 @@ func getComputedData(value ContainerData) ComputedData {
 	cpuUsage := (float64(cpuDelta) / float64(systemCpuDelta)) * float64(value.CPUStats.OnlineCpus) * 100.0
 
 	usedMemory := value.MemoryStats.Usage - value.MemoryStats.Stats.Cache
-	var memoryUsage int64
+	var memoryUsage float64
 	if value.MemoryStats.Limit != 0 {
-		memoryUsage = (usedMemory / value.MemoryStats.Limit) * 100.0
+		memoryUsage = (float64(usedMemory) / float64(value.MemoryStats.Limit)) * 100.0
 	} else {
 		memoryUsage = 0
 	}

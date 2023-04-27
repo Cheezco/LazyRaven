@@ -16,9 +16,9 @@ type ComputedData struct {
 	SystemCpuDelta  int64     `json:"systemCpuDelta"`
 	CpuUsagePerc    float64   `json:"cpuUsagePerc"`
 	UsedMemory      int64     `json:"usedMemory"`
-	MemoryUsagePerc int64     `json:"MemoryUsagePerc"`
+	MemoryUsagePerc float64   `json:"MemoryUsagePerc"`
 	NumberCpus      int       `json:"numberCpus"`
-	CpuEnergy       int       `json:"cpuEnergy"`
+	CpuEnergy       float64   `json:"cpuEnergy"`
 	TimeStamp       time.Time `json:"timeStamp"`
 }
 
