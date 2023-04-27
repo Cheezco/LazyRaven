@@ -192,7 +192,7 @@ func getComputedData(value ContainerData) ComputedData {
 		UsedMemory:      usedMemory,
 		MemoryUsagePerc: memoryUsage,
 		NumberCpus:      numberCpus,
-		CpuEnergy:       int(cpuUsage) / 100 * cpuEnergyUsage,
+		CpuEnergy:       cpuEnergy,
 		TimeStamp:       time.Now(),
 	}
 }
