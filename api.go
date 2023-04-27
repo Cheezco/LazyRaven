@@ -10,6 +10,7 @@ var storedData []ComputedData
 var data [][]ComputedData
 
 func StartApi(storedDataChan chan ComputedData) {
+	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	go storeData(storedDataChan)
 	storedData = []ComputedData{}
